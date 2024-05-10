@@ -1,0 +1,243 @@
+'******************************************************************************************************************************************************************************************************************
+' Projeto: Robo TCP (Consulta CE)
+' Módulo: Extração do CE
+' Descrição: Este módulo acessa o site do Controle de Tráfego Portuário (TCP) e realiza a extração de dados referentes a possíveis avarias identificadas. Através desse processo, o sistema busca informações sobre ocorrências de problemas ou danos relevantes no contexto portuário.
+' Autor: Nielk Nuana Carvalho dos Santos
+' Data: 17.08.2023
+'
+' Notas:
+' - Adicionado o campo Data Registro
+'
+' Revisões:
+' - N/A
+'******************************************************************************************************************************************************************************************************************
+
+Sub Clean()
+Dim UltimaLinha As Long
+
+UltimaLinha = Sheets("ConsultaCE").Cells(Rows.Count, 1).End(xlUp).Row
+
+If UltimaLinha >= 2 Then
+    Sheets("ConsultaCE").Range("A2:E" & UltimaLinha).ClearContents
+End If
+
+Sheets("Menu").Activate
+Range("A1").Select
+End Sub
+
+Sub CopiarParaConsultace()
+Dim planilhaOrigem As Worksheet
+Dim planilhaDestino As Worksheet
+    
+Set planilhaOrigem = ThisWorkbook.Sheets("Menu")
+Set planilhaDestino = ThisWorkbook.Sheets("CONSULTACE")
+    
+Dim UltimaLinha As Long
+UltimaLinha = planilhaOrigem.Cells(planilhaOrigem.Rows.Count, "BP").End(xlUp).Row
+    
+Dim i As Long
+    For i = 2 To UltimaLinha
+        Dim valorParaCopiar As Variant
+        valorParaCopiar = planilhaOrigem.Cells(i, "BP").Value
+        planilhaDestino.Cells(i, "A").Value = valorParaCopiar
+Next i
+
+Sheets("Menu").Select
+Range("A1").Select
+End Sub
+
+Sub ExtracaoCE()
+Dim driver As New WebDriver
+Dim elementoInput As WebElement
+Dim valorCelula As String
+Dim rngCelula As Range
+
+driver.AddArgument "--headless"
+driver.AddArgument "--disable-gpu"
+
+driver.Start "chrome"
+
+
+driver.Get "https://portal.tcp.com.br/login"
+    
+    Application.Wait Now + TimeValue("00:00:02")
+
+driver.FindElementByXPath("/html/body/div[1]/div/a").Click
+    
+    Application.Wait Now + TimeValue("00:00:02")
+    
+driver.FindElementByXPath("/html/body/app-root/app-public-access/horizontal-public-layout-1/div/div[1]/toolbar/mat-toolbar/div/button/span[1]").Click
+    
+    Application.Wait Now + TimeValue("00:00:02")
+    
+driver.FindElementByXPath("/html/body/app-root/app-public-access/horizontal-public-layout-1/div/div[2]/fuse-sidebar/navbar/navbar-vertical-style-1/div[2]/fuse-navigation/div/fuse-nav-vertical-collapsable[1]/a/mat-icon").Click
+
+    Application.Wait Now + TimeValue("00:00:02")
+    
+driver.FindElementByXPath("/html/body/app-root/app-public-access/horizontal-public-layout-1/div/div[2]/fuse-sidebar/navbar/navbar-vertical-style-1/div[2]/fuse-navigation/div/fuse-nav-vertical-collapsable[1]/div/fuse-nav-vertical-item[5]").Click
+
+    Application.Wait Now + TimeValue("00:00:02")
+
+Set rngCelula = ThisWorkbook.Sheets("ConsultaCE").Range("A2")
+
+Do While Not IsEmpty(rngCelula.Value)
+
+valorCelula = rngCelula.Value
+
+driver.SwitchToFrame "iframeId"
+        
+Set elementoInput = driver.FindElementByXPath("/html/body/div/div/div[2]/div[2]/div[1]/form/fieldset/ol/li/div/input")
+    elementoInput.Clear
+    elementoInput.SendKeys valorCelula
+        
+    Application.Wait Now + TimeValue("00:00:03")
+
+driver.FindElementByXPath("/html/body/div/div/div[2]/div[2]/div[1]/form/fieldset/button").Click
+    
+    Application.Wait Now + TimeValue("00:00:03")
+
+ThisWorkbook.Sheets("ConsultaCE").Range("B" & rngCelula.Row).Value = driver.FindElementByXPath("/html/body/div/div/div[2]/div[2]/div[2]/tcp-grid/div/div/div[1]/scrollable-table/div/div[2]/table/tbody/tr/td[6]/div").Text
+    
+    Application.Wait Now + TimeValue("00:00:03")
+    
+ThisWorkbook.Sheets("ConsultaCE").Range("C" & rngCelula.Row).Value = driver.FindElementByXPath("/html/body/div/div/div[2]/div[2]/div[2]/tcp-grid/div/div/div[1]/scrollable-table/div/div[2]/table/tbody/tr/td[11]").Text
+        
+    Application.Wait Now + TimeValue("00:00:03")
+        
+ThisWorkbook.Sheets("ConsultaCE").Range("D" & rngCelula.Row).Value = driver.FindElementByXPath("/html/body/div/div/div[2]/div[2]/div[2]/tcp-grid/div/div/div[1]/scrollable-table/div/div[2]/table/tbody/tr/td[15]/div").Text
+    
+    Application.Wait Now + TimeValue("00:00:03")
+    
+ThisWorkbook.Sheets("ConsultaCE").Range("E" & rngCelula.Row).Value = driver.FindElementByXPath("/html/body/div/div/div[2]/div[2]/div[2]/tcp-grid/div/div/div[1]/scrollable-table/div/div[2]/table/tbody/tr/td[16]/div").Text
+    
+    Application.Wait Now + TimeValue("00:00:03")
+    
+driver.SwitchToDefaultContent
+    
+Set rngCelula = rngCelula.Offset(1, 0)
+Loop
+driver.Quit
+
+Sheets("Menu").Select
+Range("A1").Select
+
+End Sub
+
+Sub Verificar()
+Dim ws As Worksheet
+Dim lastRow As Long
+Dim i As Long
+
+Set ws = ThisWorkbook.Sheets("ConsultaCE")
+
+lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+
+For i = 1 To lastRow
+If Not IsEmpty(ws.Cells(i, "A").Value) Then
+            If IsEmpty(ws.Cells(i, "C").Value) Then
+            ws.Cells(i, "C").Value = "Não Encontrado"
+        End If
+    End If
+Next i
+
+Sheets("Menu").Select
+Range("A1").Select
+End Sub
+
+Sub B()
+    Dim ws As Worksheet
+    Dim rng As Range
+    Dim cell As Range
+    
+    ' Defina a planilha onde as datas estão localizadas
+    Set ws = ThisWorkbook.Sheets("ConsultaCE") ' Altere para o nome da sua planilha
+    
+    ' Defina o intervalo de células onde estão as datas e horários (a partir da célula B2)
+    Set rng = ws.Range("B2:B" & ws.Cells(ws.Rows.Count, "B").End(xlUp).Row)
+    
+    ' Loop através de cada célula no intervalo
+    For Each cell In rng
+        ' Verifique se o valor na célula é uma data e hora válida
+        If IsDate(cell.Value) Then
+            ' Converta para o formato português
+            cell.Value = Format(cell.Value, "dd/mm/yyyy hh:mm")
+        End If
+    Next cell
+    
+    ' Informe ao usuário que a conversão foi concluída
+    MsgBox "Conversão concluída!", vbInformation
+End Sub
+
+Sub E()
+    Dim ws As Worksheet
+    Dim rng As Range
+    Dim cell As Range
+    
+    ' Defina a planilha onde as datas estão localizadas
+    Set ws = ThisWorkbook.Sheets("ConsultaCE") ' Altere para o nome da sua planilha
+    
+    ' Defina o intervalo de células onde estão as datas e horários (a partir da célula B2)
+    Set rng = ws.Range("E2:E" & ws.Cells(ws.Rows.Count, "E").End(xlUp).Row)
+    
+    ' Loop através de cada célula no intervalo
+    For Each cell In rng
+        ' Verifique se o valor na célula é uma data e hora válida
+        If IsDate(cell.Value) Then
+            ' Converta para o formato português
+            cell.Value = Format(cell.Value, "dd/mm/yyyy hh:mm")
+        End If
+    Next cell
+    
+    ' Informe ao usuário que a conversão foi concluída
+    MsgBox "Conversão concluída!", vbInformation
+End Sub
+
+Sub CriarRelatorio()
+Dim novoArquivo As Workbook
+Dim planilhaOrigem As Worksheet
+Dim planilhaDestino As Worksheet
+Dim ultimaLinhaOrigem As Long
+Dim nomeNovoArquivo As String
+    
+Set planilhaOrigem = ThisWorkbook.Sheets("ConsultaCE")
+Set novoArquivo = Workbooks.Add
+Set planilhaDestino = novoArquivo.Sheets(1)
+
+planilhaDestino.Name = "NovaAba"
+
+ultimaLinhaOrigem = planilhaOrigem.Cells(planilhaOrigem.Rows.Count, "A").End(xlUp).Row
+
+planilhaOrigem.Range("A1:Z" & ultimaLinhaOrigem).Copy planilhaDestino.Range("A1")
+    
+planilhaDestino.Cells.EntireColumn.AutoFit
+
+nomeNovoArquivo = "ExtraçãoTCP_" & Format(Now, "YYYY.MM.DD_HH.MM.SS") & ".xlsx"
+    
+novoArquivo.SaveAs ThisWorkbook.Path & "\" & nomeNovoArquivo, FileFormat:=xlOpenXMLWorkbook
+    
+novoArquivo.Close SaveChanges:=False
+    
+Application.CutCopyMode = False
+
+End Sub
+
+Sub RoboCE()
+
+Application.Visible = False
+Application.ScreenUpdating = False
+
+Call Clean
+Call CopiarParaConsultace
+Call ExtracaoCE
+Call Verificar
+Call B
+Call E
+Call CriarRelatorio
+
+Sheets("Menu").Select
+Range("A1").Select
+
+Application.Visible = True
+Application.ScreenUpdating = True
+
+End Sub
